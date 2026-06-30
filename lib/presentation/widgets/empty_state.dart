@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-/// Generic empty state used across all non-home screens.
-/// The Home screen uses its own [_HomeEmptyState] for richer context.
+import '../../../core/theme/app_theme.dart';
+
 class EmptyState extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -21,82 +21,78 @@ class EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
+        padding: const EdgeInsets.symmetric(horizontal: kPad + 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Icon in gradient circle ──────────────────────────
+            // Icon in gradient circle
             Container(
               width: 88,
               height: 88,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
+                gradient: const LinearGradient(
                   colors: [
-                    cs.primaryContainer,
-                    cs.secondaryContainer,
+                    Color(0x336C63FF),
+                    Color(0x1A00E5FF),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 shape: BoxShape.circle,
+                border: Border.all(color: kDivider),
                 boxShadow: [
                   BoxShadow(
-                    color: cs.primary.withValues(alpha: 0.15),
-                    blurRadius: 18,
-                    offset: const Offset(0, 5),
+                    color: kPrimary.withValues(alpha: 0.18),
+                    blurRadius: 24,
+                    offset: const Offset(0, 6),
                   ),
                 ],
               ),
-              child: Icon(icon, size: 42, color: cs.onPrimaryContainer),
+              child: Icon(icon, size: 40, color: kPrimary),
             ).animate().scale(
-                  duration: 480.ms,
+                  duration: 450.ms,
                   curve: Curves.elasticOut,
                 ),
 
-            const SizedBox(height: 22),
+            const SizedBox(height: 24),
 
             Text(
               title,
-              style: tt.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: cs.onSurface,
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 22,
+                fontWeight: FontWeight.w600,
+                color: kText,
+                letterSpacing: -0.3,
               ),
               textAlign: TextAlign.center,
-            ).animate().fadeIn(duration: 400.ms, delay: 120.ms),
+            ).animate().fadeIn(duration: 380.ms, delay: 100.ms),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: kTextGap),
 
             Text(
               subtitle,
-              style: tt.bodyMedium?.copyWith(
-                color: cs.onSurfaceVariant,
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 15,
+                color: kTextSec,
                 height: 1.55,
               ),
               textAlign: TextAlign.center,
-            ).animate().fadeIn(duration: 400.ms, delay: 200.ms),
+            ).animate().fadeIn(duration: 380.ms, delay: 180.ms),
 
-            // ── Action button (uses primary FilledButton, not tonal) ──
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: 28),
               FilledButton.icon(
                 onPressed: onAction,
-                icon: const Icon(Icons.add_rounded),
+                icon: const Icon(Icons.add_rounded, size: 20),
                 label: Text(actionLabel!),
-                style: FilledButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                  textStyle: const TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 14),
-                ),
               )
                   .animate()
-                  .fadeIn(duration: 400.ms, delay: 300.ms)
-                  .slideY(begin: 0.12, curve: Curves.easeOut),
+                  .fadeIn(duration: 380.ms, delay: 260.ms)
+                  .slideY(begin: 0.1, curve: Curves.easeOut),
             ],
           ],
         ),
