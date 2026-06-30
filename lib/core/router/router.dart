@@ -35,6 +35,8 @@ class RouteNames {
 final goRouterProvider = Provider<GoRouter>((ref) {
   // Reacts to settings changes (onboardingCompleted flag).
   final settingsAsync = ref.watch(settingsNotifierProvider);
+  // Also waits for the splash animation to finish before navigating.
+  final splashReady = ref.watch(splashReadyProvider);
 
   return GoRouter(
     initialLocation: '/splash',
@@ -51,8 +53,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       final isSplash = state.matchedLocation == '/splash';
       final isOnboarding = state.matchedLocation == '/onboarding';
 
-      // While settings are still loading keep the user on splash.
-      final isLoading = settingsAsync.isLoading;
+      // Keep user on splash while settings are loading OR animation not done.
+      final isLoading = settingsAsync.isLoading || !splashReady;
       if (isLoading) return isSplash ? null : '/splash';
 
       final onboardingDone = settingsAsync.maybeWhen(
@@ -60,7 +62,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         orElse: () => false,
       );
 
-      // If we are on splash and settings are ready, decide where to go.
+      // Settings ready + animation done — decide where to go.
       if (isSplash) {
         return onboardingDone ? '/home' : '/onboarding';
       }

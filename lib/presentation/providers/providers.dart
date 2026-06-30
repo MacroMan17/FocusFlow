@@ -33,6 +33,14 @@ import '../../domain/usecases/task/search_tasks_use_case.dart';
 import '../../domain/usecases/task/update_task_use_case.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SPLASH GATE
+// Splash screen sets this true when its animation finishes.
+// Router waits for both this AND settings loaded before navigating away.
+// ─────────────────────────────────────────────────────────────────────────────
+
+final splashReadyProvider = StateProvider<bool>((_) => false);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // DATASOURCES
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -348,7 +356,8 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
   final GetAllTasksUseCase _getAllTasks;
   final Ref _ref;
 
-  TaskListNotifier(this._getAllTasks, this._ref) : super(const TaskListState()) {
+  TaskListNotifier(this._getAllTasks, this._ref)
+      : super(const TaskListState()) {
     load();
   }
 
