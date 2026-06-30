@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../../core/theme/app_theme.dart';
+import '../../../core/router/router.dart';
 import '../providers/providers.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Category filter chips
-// Spec: height 42dp, horizontal padding 18dp, radius 20dp, 14sp Medium
-// ─────────────────────────────────────────────────────────────────────────────
+const _kTeal = Color(0xFF00C896);
+const _kBg = Color(0xFF070D1A);
+const _kGlass = Color(0x1AFFFFFF);
+const _kBorder = Color(0x33FFFFFF);
+const _kTextSec = Color(0xFF8899AA);
 
 class CategoryFilterChips extends ConsumerWidget {
   const CategoryFilterChips({super.key});
@@ -21,38 +23,62 @@ class CategoryFilterChips extends ConsumerWidget {
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),
       data: (categories) {
-        if (categories.isEmpty) return const SizedBox.shrink();
         return SizedBox(
           height: 42,
-          child: ListView.separated(
+          child: ListView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: kPad),
-            itemCount: categories.length + 1,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
-            itemBuilder: (_, i) {
-              if (i == 0) {
-                final sel = taskState.categoryFilter == null;
-                return _FilterChip(
-                  label: 'All',
-                  color: kPrimary,
-                  selected: sel,
-                  onTap: () => ref
-                      .read(taskListNotifierProvider.notifier)
-                      .setCategoryFilter(null),
-                );
-              }
-              final cat = categories[i - 1];
-              final sel = taskState.categoryFilter == cat.id;
-              return _FilterChip(
-                label: cat.name,
-                color: Color(cat.color),
-                selected: sel,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            children: [
+              // "All" chip
+              _Chip(
+                label: 'All',
+                color: _kTeal,
+                selected: taskState.categoryFilter == null,
                 onTap: () => ref
                     .read(taskListNotifierProvider.notifier)
-                    .setCategoryFilter(sel ? null : cat.id),
-                dot: true,
-              );
-            },
+                    .setCategoryFilter(null),
+                showCheck: true,
+              ),
+
+              // Category chips
+              ...categories.map((cat) {
+                final sel = taskState.categoryFilter == cat.id;
+                final color = Color(cat.color);
+                return Padding(
+                  padding: const EdgeInsets.only(left: 10),
+                  child: _Chip(
+                    label: cat.name,
+                    color: color,
+                    selected: sel,
+                    onTap: () => ref
+                        .read(taskListNotifierProvider.notifier)
+                        .setCategoryFilter(sel ? null : cat.id),
+                    dot: true,
+                  ),
+                );
+              }),
+
+              // "+" add category
+              const SizedBox(width: 10),
+              GestureDetector(
+                onTap: () {
+                  if (context.mounted) {
+                    context.goNamed(RouteNames.categories);
+                  }
+                },
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: _kGlass,
+                    borderRadius: BorderRadius.circular(21),
+                    border: Border.all(color: _kBorder),
+                  ),
+                  child:
+                      const Icon(Icons.add_rounded, size: 20, color: _kTextSec),
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -60,31 +86,28 @@ class CategoryFilterChips extends ConsumerWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Single chip with spring press animation
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _FilterChip extends StatefulWidget {
+class _Chip extends StatefulWidget {
   final String label;
   final Color color;
   final bool selected;
   final VoidCallback onTap;
   final bool dot;
+  final bool showCheck;
 
-  const _FilterChip({
+  const _Chip({
     required this.label,
     required this.color,
     required this.selected,
     required this.onTap,
     this.dot = false,
+    this.showCheck = false,
   });
 
   @override
-  State<_FilterChip> createState() => _FilterChipState();
+  State<_Chip> createState() => _ChipState();
 }
 
-class _FilterChipState extends State<_FilterChip>
-    with SingleTickerProviderStateMixin {
+class _ChipState extends State<_Chip> with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<double> _scale;
 
@@ -92,10 +115,9 @@ class _FilterChipState extends State<_FilterChip>
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 280));
-    _scale = Tween<double>(begin: 1.0, end: 0.93).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut),
-    );
+        vsync: this, duration: const Duration(milliseconds: 260));
+    _scale = Tween<double>(begin: 1.0, end: 0.93)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut));
   }
 
   @override
@@ -114,58 +136,55 @@ class _FilterChipState extends State<_FilterChip>
 
   @override
   Widget build(BuildContext context) {
-    final c = widget.color;
+    final sel = widget.selected;
     return AnimatedBuilder(
       animation: _scale,
       builder: (_, child) => Transform.scale(scale: _scale.value, child: child),
       child: GestureDetector(
         onTap: _tap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
+          duration: const Duration(milliseconds: 200),
           height: 42,
-          padding: const EdgeInsets.symmetric(horizontal: 18),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
-            color: widget.selected ? c.withValues(alpha: 0.18) : kGlass,
-            borderRadius: BorderRadius.circular(kChipRadius),
+            color: sel ? widget.color : _kGlass,
+            borderRadius: BorderRadius.circular(21),
             border: Border.all(
-              color: widget.selected ? c.withValues(alpha: 0.55) : kDivider,
-              width: 1,
+              color: sel ? widget.color : _kBorder,
             ),
-            boxShadow: widget.selected
+            boxShadow: sel
                 ? [
                     BoxShadow(
-                      color: c.withValues(alpha: 0.25),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    )
+                        color: widget.color.withValues(alpha: 0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2))
                   ]
                 : null,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (widget.dot) ...[
+              if (widget.showCheck && sel) ...[
+                Icon(Icons.check_rounded, size: 14, color: _kBg),
+                const SizedBox(width: 5),
+              ] else if (widget.dot) ...[
                 Container(
-                  width: 7,
-                  height: 7,
+                  width: 8,
+                  height: 8,
                   decoration: BoxDecoration(
-                    color: c,
+                    color: sel ? _kBg : widget.color,
                     shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(color: c.withValues(alpha: 0.5), blurRadius: 4),
-                    ],
                   ),
                 ),
-                const SizedBox(width: 7),
+                const SizedBox(width: 6),
               ],
               Text(
                 widget.label,
                 style: TextStyle(
                   fontFamily: 'Inter',
-                  fontSize: 14,
-                  fontWeight:
-                      widget.selected ? FontWeight.w600 : FontWeight.w500,
-                  color: widget.selected ? c : kTextSec,
+                  fontSize: 13,
+                  fontWeight: sel ? FontWeight.w600 : FontWeight.w500,
+                  color: sel ? _kBg : _kTextSec,
                 ),
               ),
             ],

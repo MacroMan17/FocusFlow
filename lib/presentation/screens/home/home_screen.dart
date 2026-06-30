@@ -9,7 +9,6 @@ import 'package:intl/intl.dart';
 import 'package:lottie/lottie.dart';
 
 import '../../../core/router/router.dart';
-import '../../../core/theme/app_theme.dart';
 import '../../providers/providers.dart';
 import '../../widgets/category_filter_chips.dart';
 import '../../widgets/quote_card.dart';
@@ -18,19 +17,24 @@ import '../../widgets/task_list_shimmer.dart';
 import '../../widgets/task_sort_sheet.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HomeScreen
-// Visual hierarchy (spec):
-//   1. Greeting (36sp Bold) + date + quick actions
-//   2. Quote card
-//   3. Progress ring + today stats
-//   4. Filter chips (status)
-//   5. Category chips
-//   6. Task list  ←  or empty state
+// Jungle / Screenshot-match color tokens
 // ─────────────────────────────────────────────────────────────────────────────
+const _kBg = Color(0xFF070D1A); // near-black bg
+const _kBg2 = Color(0xFF0D1628); // card bg
+const _kGlass = Color(0x1AFFFFFF); // glass surface
+const _kTeal = Color(0xFF00C896); // jungle teal / primary green
+const _kTealDim = Color(0x2600C896); // teal 15% fill
+const _kPurple = Color(0xFF7C4DFF); // "All Tasks" card
+const _kAmber = Color(0xFFF39C12); // Pending
+const _kRed = Color(0xFFFF5C7A); // Overdue
+const _kGreen = Color(0xFF2ECC71); // Completed
+const _kText = Color(0xFFFFFFFF);
+const _kTextSec = Color(0xFF8899AA);
+const _kDivider = Color(0x18FFFFFF);
+const _kBorder = Color(0x33FFFFFF);
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
-
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
@@ -50,7 +54,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   void initState() {
     super.initState();
-
     _ringCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 1200));
     _fabCtrl = AnimationController(
@@ -58,7 +61,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _entranceCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 500));
     _staggerCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 500));
+        vsync: this, duration: const Duration(milliseconds: 600));
 
     _ringAnim = CurvedAnimation(parent: _ringCtrl, curve: Curves.easeOutCubic);
     _fabScale = CurvedAnimation(parent: _fabCtrl, curve: Curves.elasticOut);
@@ -108,18 +111,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final taskState = ref.watch(taskListNotifierProvider);
     final tasks = taskState.filteredAndSorted;
     final all = taskState.tasks;
-    final todayTotal = all.where((t) => t.isDueToday).length;
-    final todayCompleted =
-        all.where((t) => t.isDueToday && t.isCompleted).length;
-    final ringTarget = todayTotal == 0 ? 0.0 : todayCompleted / todayTotal;
+    final total = all.length;
+    final completed = all.where((t) => t.isCompleted).length;
+    final pending = all.where((t) => !t.isCompleted).length;
+    final overdue = all.where((t) => t.isOverdue).length;
+    final ringTarget = total == 0 ? 0.0 : completed / total;
 
     _updateRing(ringTarget);
 
     return Scaffold(
-      backgroundColor: kBg,
+      backgroundColor: _kBg,
       appBar: AppBar(
           toolbarHeight: 0,
-          backgroundColor: kBg,
+          backgroundColor: _kBg,
           elevation: 0,
           scrolledUnderElevation: 0),
       body: taskState.isLoading
@@ -127,15 +131,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           : taskState.error != null
               ? Center(
                   child: Text(taskState.error!,
-                      style: const TextStyle(color: kTextSec)))
+                      style: const TextStyle(color: _kTextSec)))
               : CustomScrollView(
                   physics: const BouncingScrollPhysics(),
                   slivers: [
-                    // ── 1. Greeting header ─────────────────────
+                    // ── HEADER: date + greeting + ring ─────────
                     SliverToBoxAdapter(
-                      child: _GreetingHeader(
-                        todayTotal: todayTotal,
-                        todayCompleted: todayCompleted,
+                      child: _Header(
+                        total: total,
+                        completedCount: completed,
                         ringAnim: _ringAnim,
                         entranceCtrl: _entranceCtrl,
                         onSearch: () => context.goNamed(RouteNames.search),
@@ -145,85 +149,56 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       ),
                     ),
 
-                    // ── Gap ────────────────────────────────────
-                    const SliverToBoxAdapter(child: SizedBox(height: kSecGap)),
+                    const SliverToBoxAdapter(child: SizedBox(height: 20)),
 
-                    // ── 2. Quote card ──────────────────────────
+                    // ── QUOTE CARD ─────────────────────────────
                     const SliverToBoxAdapter(
                         child: RepaintBoundary(child: QuoteCard())),
 
-                    // ── Gap ────────────────────────────────────
-                    const SliverToBoxAdapter(child: SizedBox(height: kSecGap)),
+                    const SliverToBoxAdapter(child: SizedBox(height: 20)),
 
-                    // ── 3. Filter chips (status) ───────────────
-                    SliverToBoxAdapter(child: _StatusFilterRow()),
-
-                    // ── Gap ────────────────────────────────────
-                    const SliverToBoxAdapter(child: SizedBox(height: kCardGap)),
-
-                    // ── 4. Category chips ──────────────────────
-                    const SliverToBoxAdapter(
-                        child: RepaintBoundary(child: CategoryFilterChips())),
-
-                    // ── Gap ────────────────────────────────────
-                    const SliverToBoxAdapter(child: SizedBox(height: kSecGap)),
-
-                    // ── Section title ──────────────────────────
+                    // ── STAT CARDS ROW ─────────────────────────
                     SliverToBoxAdapter(
-                      child: Padding(
-                        padding:
-                            const EdgeInsets.fromLTRB(kPad, 0, kPad, kCardGap),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              _sectionTitle(taskState.filter),
-                              style: const TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 22,
-                                fontWeight: FontWeight.w600,
-                                color: kText,
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                            // Task count badge
-                            if (tasks.isNotEmpty)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: kGlass,
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: const Border.fromBorderSide(
-                                      BorderSide(color: kDivider)),
-                                ),
-                                child: Text(
-                                  '${tasks.length}',
-                                  style: const TextStyle(
-                                    fontFamily: 'Inter',
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: kPrimary,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
+                      child: _StatCardsRow(
+                        total: total,
+                        completed: completed,
+                        pending: pending,
+                        overdue: overdue,
                       ),
                     ),
 
-                    // ── 5. Task list OR empty state ────────────
+                    const SliverToBoxAdapter(child: SizedBox(height: 20)),
+
+                    // ── FILTER BY STATUS ───────────────────────
+                    SliverToBoxAdapter(
+                      child: _SectionLabel('FILTER BY STATUS'),
+                    ),
+                    const SliverToBoxAdapter(child: SizedBox(height: 10)),
+                    SliverToBoxAdapter(child: _StatusChips()),
+
+                    const SliverToBoxAdapter(child: SizedBox(height: 18)),
+
+                    // ── FILTER BY CATEGORY ─────────────────────
+                    SliverToBoxAdapter(
+                      child: _SectionLabel('FILTER BY CATEGORY'),
+                    ),
+                    const SliverToBoxAdapter(child: SizedBox(height: 10)),
+                    const SliverToBoxAdapter(
+                        child: RepaintBoundary(child: CategoryFilterChips())),
+
+                    const SliverToBoxAdapter(child: SizedBox(height: 24)),
+
+                    // ── TASK LIST / EMPTY STATE ────────────────
                     tasks.isEmpty
                         ? SliverFillRemaining(
                             hasScrollBody: false,
-                            child: _HomeEmptyState(filter: taskState.filter),
+                            child: _EmptyState(filter: taskState.filter),
                           )
                         : SliverPadding(
-                            padding:
-                                const EdgeInsets.fromLTRB(kPad, 0, kPad, 120),
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
                             sliver: SliverList(
                               delegate: SliverChildBuilderDelegate(
-                                (context, i) {
+                                (ctx, i) {
                                   final task = tasks[i];
                                   final start = (i * 55 / 1000).clamp(0.0, 0.9);
                                   final end =
@@ -234,8 +209,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                         curve: Curves.easeOut),
                                   );
                                   return Padding(
-                                    padding:
-                                        const EdgeInsets.only(bottom: kCardGap),
+                                    padding: const EdgeInsets.only(bottom: 12),
                                     child: FadeTransition(
                                       opacity: anim,
                                       child: SlideTransition(
@@ -246,7 +220,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                         child: TaskCard(
                                           key: ValueKey(task.id),
                                           task: task,
-                                          onTap: () => context.goNamed(
+                                          onTap: () => ctx.goNamed(
                                             RouteNames.taskDetail,
                                             pathParameters: {'id': task.id},
                                           ),
@@ -258,8 +232,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                                 .toggleComplete(
                                                     task.id, task.isCompleted);
                                             if (!task.isCompleted &&
-                                                context.mounted) {
-                                              ScaffoldMessenger.of(context)
+                                                ctx.mounted) {
+                                              ScaffoldMessenger.of(ctx)
                                                   .showSnackBar(SnackBar(
                                                 content: const Text(
                                                     'Task completed ✓'),
@@ -282,8 +256,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                                 .read(taskListNotifierProvider
                                                     .notifier)
                                                 .deleteTask(task.id);
-                                            if (context.mounted) {
-                                              ScaffoldMessenger.of(context)
+                                            if (ctx.mounted) {
+                                              ScaffoldMessenger.of(ctx)
                                                   .showSnackBar(const SnackBar(
                                                 content: Text('Task deleted'),
                                                 duration: Duration(seconds: 3),
@@ -302,49 +276,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   ],
                 ),
 
-      // ── FAB: 72dp, gradient Purple→Cyan ─────────────────────
+      // ── FAB — teal pill matching screenshot ───────────────────
       floatingActionButton: ScaleTransition(
         scale: _fabScale,
-        child: _GradientFAB(
-          onTap: () => context.goNamed(RouteNames.taskAdd),
-        ),
+        child: _FAB(onTap: () => context.goNamed(RouteNames.taskAdd)),
       ),
     );
-  }
-
-  String _sectionTitle(TaskFilter f) {
-    switch (f) {
-      case TaskFilter.all:
-        return "Today's Tasks";
-      case TaskFilter.today:
-        return 'Due Today';
-      case TaskFilter.upcoming:
-        return 'Upcoming';
-      case TaskFilter.overdue:
-        return 'Overdue';
-      case TaskFilter.completed:
-        return 'Completed';
-    }
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Greeting Header — spec hierarchy item 1
-// Greeting: 36sp Bold / -0.5 / line-height 42
+// Header: date pill + greeting + subtitle + progress ring + actions
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _GreetingHeader extends StatelessWidget {
-  final int todayTotal;
-  final int todayCompleted;
+class _Header extends StatelessWidget {
+  final int total;
+  final int completedCount;
   final Animation<double> ringAnim;
   final AnimationController entranceCtrl;
   final VoidCallback onSearch;
   final VoidCallback onCategories;
   final VoidCallback onSort;
 
-  const _GreetingHeader({
-    required this.todayTotal,
-    required this.todayCompleted,
+  const _Header({
+    required this.total,
+    required this.completedCount,
     required this.ringAnim,
     required this.entranceCtrl,
     required this.onSearch,
@@ -354,9 +310,9 @@ class _GreetingHeader extends StatelessWidget {
 
   String _greeting() {
     final h = DateTime.now().hour;
-    if (h < 12) return 'Good morning';
-    if (h < 17) return 'Good afternoon';
-    return 'Good evening';
+    if (h < 12) return 'Good morning,';
+    if (h < 17) return 'Good afternoon,';
+    return 'Good evening,';
   }
 
   @override
@@ -365,258 +321,164 @@ class _GreetingHeader extends StatelessWidget {
     final reduce = MediaQuery.of(context).disableAnimations;
     final fade = CurvedAnimation(
         parent: entranceCtrl,
-        curve: const Interval(0.0, 0.7, curve: Curves.easeOut));
+        curve: const Interval(0.0, 0.8, curve: Curves.easeOut));
+    final progress = total == 0 ? 0.0 : completedCount / total;
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(kPad, 16, kPad, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Top row: date + action icons ──────────────────────
-          FadeTransition(
-            opacity: fade,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Date pill
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: kGlass,
-                    borderRadius: BorderRadius.circular(kChipRadius),
-                    border: const Border.fromBorderSide(
-                        BorderSide(color: kDivider)),
-                  ),
-                  child: Text(
-                    dateStr,
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: kTextSec,
-                      letterSpacing: 0.2,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: FadeTransition(
+        opacity: fade,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── LEFT: date + greeting + subtitle + actions ─────
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Date pill with calendar icon
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: _kTealDim,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: _kTeal.withValues(alpha: 0.4),
+                      ),
                     ),
-                  ),
-                ),
-
-                // Action buttons
-                Row(
-                  children: [
-                    _ActionBtn(
-                        icon: Icons.search_rounded,
-                        tooltip: 'Search',
-                        onTap: onSearch),
-                    const SizedBox(width: 4),
-                    _ActionBtn(
-                        icon: Icons.label_outline_rounded,
-                        tooltip: 'Categories',
-                        onTap: onCategories),
-                    const SizedBox(width: 4),
-                    _ActionBtn(
-                        icon: Icons.sort_rounded,
-                        tooltip: 'Sort',
-                        onTap: onSort),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // ── Greeting 36sp Bold ────────────────────────────────
-          SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(-0.04, 0),
-              end: Offset.zero,
-            ).animate(CurvedAnimation(
-                parent: entranceCtrl,
-                curve: const Interval(0.1, 0.8, curve: Curves.easeOut))),
-            child: FadeTransition(
-              opacity: fade,
-              child: reduce
-                  ? Text(
-                      '${_greeting()} 👋',
-                      style: const TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 36,
-                        fontWeight: FontWeight.w700,
-                        color: kText,
-                        letterSpacing: -0.5,
-                        height: 42 / 36,
-                      ),
-                    )
-                  : DefaultTextStyle(
-                      style: const TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 36,
-                        fontWeight: FontWeight.w700,
-                        color: kText,
-                        letterSpacing: -0.5,
-                        height: 42 / 36,
-                      ),
-                      child: AnimatedTextKit(
-                        animatedTexts: [
-                          TypewriterAnimatedText(
-                            '${_greeting()} 👋',
-                            speed: const Duration(milliseconds: 52),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.calendar_today_rounded,
+                            size: 12, color: _kTeal),
+                        const SizedBox(width: 5),
+                        Text(
+                          dateStr,
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _kTeal,
                           ),
-                        ],
-                        totalRepeatCount: 1,
-                        displayFullTextOnTap: true,
-                        stopPauseOnTap: true,
-                      ),
+                        ),
+                      ],
                     ),
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          // ── Progress ring + stats row ─────────────────────────
-          FadeTransition(
-            opacity: CurvedAnimation(
-                parent: entranceCtrl,
-                curve: const Interval(0.3, 1.0, curve: Curves.easeOut)),
-            child: _ProgressRow(
-              ringAnim: ringAnim,
-              todayCompleted: todayCompleted,
-              todayTotal: todayTotal,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Progress ring + stats row
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _ProgressRow extends StatelessWidget {
-  final Animation<double> ringAnim;
-  final int todayCompleted;
-  final int todayTotal;
-
-  const _ProgressRow({
-    required this.ringAnim,
-    required this.todayCompleted,
-    required this.todayTotal,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = todayTotal == 0 ? 0.0 : todayCompleted / todayTotal;
-
-    return Container(
-      padding: const EdgeInsets.all(kCardPad),
-      decoration: BoxDecoration(
-        color: kGlass,
-        borderRadius: BorderRadius.circular(kCardRadius),
-        border: const Border.fromBorderSide(BorderSide(color: kDivider)),
-      ),
-      child: Row(
-        children: [
-          // ── Animated ring ────────────────────────────────────
-          AnimatedBuilder(
-            animation: ringAnim,
-            builder: (_, __) => _RingWidget(
-              animatedProgress: ringAnim.value * progress,
-              completed: todayCompleted,
-              total: todayTotal,
-            ),
-          ),
-
-          const SizedBox(width: 20),
-
-          // ── Stats ────────────────────────────────────────────
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Bar
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 6,
-                    backgroundColor: kDivider,
-                    valueColor: const AlwaysStoppedAnimation(kPrimary),
                   ),
-                ),
-                const SizedBox(height: 12),
 
-                // Numbers row
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _StatChip(
-                        value: todayCompleted,
-                        label: 'Done',
-                        color: kCompleted),
-                    _StatChip(
-                        value: todayTotal - todayCompleted,
-                        label: 'Left',
-                        color: kWarning),
-                    _StatChip(
-                        value: todayTotal, label: 'Total', color: kPrimary),
-                  ],
-                ),
-              ],
+                  const SizedBox(height: 14),
+
+                  // Greeting line: "Good afternoon, Sumit 👋"
+                  // "Good afternoon," in white, name in teal
+                  reduce
+                      ? _GreetingText(greeting: _greeting())
+                      : _TypewriterGreeting(greeting: _greeting()),
+
+                  const SizedBox(height: 8),
+
+                  // Subtitle
+                  const Text(
+                    "You're all clear! Add something\nto tackle today.",
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                      color: _kTextSec,
+                      height: 1.5,
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Action buttons row
+                  Row(
+                    children: [
+                      _ActionBtn(icon: Icons.search_rounded, onTap: onSearch),
+                      const SizedBox(width: 10),
+                      _ActionBtn(
+                          icon: Icons.label_outline_rounded,
+                          onTap: onCategories),
+                      const SizedBox(width: 10),
+                      _ActionBtn(icon: Icons.sort_rounded, onTap: onSort),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
+
+            const SizedBox(width: 16),
+
+            // ── RIGHT: Progress ring ────────────────────────────
+            AnimatedBuilder(
+              animation: ringAnim,
+              builder: (_, __) => _RingWidget(
+                animatedProgress: ringAnim.value * progress,
+                completed: completedCount,
+                total: total,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GreetingText extends StatelessWidget {
+  final String greeting;
+  const _GreetingText({required this.greeting});
+
+  @override
+  Widget build(BuildContext context) {
+    return RichText(
+      text: TextSpan(
+        style: const TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 26,
+          fontWeight: FontWeight.w700,
+          height: 1.2,
+        ),
+        children: [
+          TextSpan(text: '$greeting ', style: const TextStyle(color: _kText)),
+          const TextSpan(text: 'Sumit ', style: TextStyle(color: _kTeal)),
+          const TextSpan(text: '👋', style: TextStyle(color: _kText)),
         ],
       ),
     );
   }
 }
 
-class _StatChip extends StatelessWidget {
-  final int value;
-  final String label;
-  final Color color;
-
-  const _StatChip({
-    required this.value,
-    required this.label,
-    required this.color,
-  });
+class _TypewriterGreeting extends StatelessWidget {
+  final String greeting;
+  const _TypewriterGreeting({required this.greeting});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // 32sp Bold statistics number
-        Text(
-          '$value',
-          style: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 32,
-            fontWeight: FontWeight.w700,
-            color: color,
-            height: 1,
+    return DefaultTextStyle(
+      style: const TextStyle(
+        fontFamily: 'Inter',
+        fontSize: 26,
+        fontWeight: FontWeight.w700,
+        color: _kText,
+        height: 1.2,
+      ),
+      child: AnimatedTextKit(
+        animatedTexts: [
+          TypewriterAnimatedText(
+            '$greeting Sumit 👋',
+            speed: const Duration(milliseconds: 50),
           ),
-        ),
-        const SizedBox(height: 3),
-        // 15sp Medium label
-        Text(
-          label,
-          style: const TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
-            color: kTextSec,
-          ),
-        ),
-      ],
+        ],
+        totalRepeatCount: 1,
+        displayFullTextOnTap: true,
+        stopPauseOnTap: true,
+      ),
     );
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Ring widget with CustomPainter
+// Progress Ring — teal arc, "X/Y\nTasks Done" center
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _RingWidget extends StatelessWidget {
@@ -633,42 +495,43 @@ class _RingWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 72,
-      height: 72,
+      width: 88,
+      height: 88,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          CustomPaint(
-            painter: _RingPainter(progress: animatedProgress),
-          ),
+          CustomPaint(painter: _RingPainter(progress: animatedProgress)),
           Center(
-            child: total == 0
-                ? const Icon(Icons.check_circle_outline_rounded,
-                    color: kPrimary, size: 28)
-                : Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '$completed',
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                total == 0
+                    ? const Icon(Icons.check_rounded, color: _kTeal, size: 28)
+                    : Text(
+                        '$completed / $total',
                         style: const TextStyle(
                           fontFamily: 'Inter',
-                          fontSize: 20,
+                          fontSize: 15,
                           fontWeight: FontWeight.w700,
-                          color: kPrimary,
+                          color: _kText,
                           height: 1,
                         ),
                       ),
-                      Text(
-                        'of $total',
-                        style: const TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 10,
-                          color: kTextSec,
-                          height: 1.3,
-                        ),
-                      ),
-                    ],
+                if (total > 0) ...[
+                  const SizedBox(height: 3),
+                  const Text(
+                    'Tasks Done',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 9,
+                      color: _kTextSec,
+                      height: 1.2,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
+                ],
+              ],
+            ),
           ),
         ],
       ),
@@ -683,25 +546,21 @@ class _RingPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final c = Offset(size.width / 2, size.height / 2);
-    final r = (size.width - 7) / 2;
+    final r = (size.width - 8) / 2;
     final p = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 7
+      ..strokeWidth = 8
       ..strokeCap = StrokeCap.round;
 
-    // Track
-    p.color = kDivider;
+    p.color = _kTeal.withValues(alpha: 0.18);
     canvas.drawCircle(c, r, p);
 
     if (progress > 0) {
-      // Glow pass
-      p.color = kPrimary.withValues(alpha: 0.3);
+      p.color = _kTeal.withValues(alpha: 0.3);
       p.maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
       canvas.drawArc(Rect.fromCircle(center: c, radius: r), -math.pi / 2,
           2 * math.pi * progress, false, p);
-
-      // Solid pass
-      p.color = kPrimary;
+      p.color = _kTeal;
       p.maskFilter = null;
       canvas.drawArc(Rect.fromCircle(center: c, radius: r), -math.pi / 2,
           2 * math.pi * progress, false, p);
@@ -713,35 +572,163 @@ class _RingPainter extends CustomPainter {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Action button (top-right icons)
+// 4 Stat Cards Row: All Tasks / Completed / Pending / Overdue
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _ActionBtn extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  const _ActionBtn({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
+class _StatCardsRow extends StatelessWidget {
+  final int total, completed, pending, overdue;
+  const _StatCardsRow({
+    required this.total,
+    required this.completed,
+    required this.pending,
+    required this.overdue,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: kGlass,
-            borderRadius: BorderRadius.circular(14),
-            border: const Border.fromBorderSide(BorderSide(color: kDivider)),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          Expanded(
+              child: _StatCard(
+            icon: Icons.list_alt_rounded,
+            value: total,
+            label: 'All Tasks',
+            color: _kPurple,
+          )),
+          const SizedBox(width: 10),
+          Expanded(
+              child: _StatCard(
+            icon: Icons.check_circle_rounded,
+            value: completed,
+            label: 'Completed',
+            color: _kGreen,
+          )),
+          const SizedBox(width: 10),
+          Expanded(
+              child: _StatCard(
+            icon: Icons.access_time_rounded,
+            value: pending,
+            label: 'Pending',
+            color: _kAmber,
+          )),
+          const SizedBox(width: 10),
+          Expanded(
+              child: _StatCard(
+            icon: Icons.warning_rounded,
+            value: overdue,
+            label: 'Overdue',
+            color: _kRed,
+          )),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  final IconData icon;
+  final int value;
+  final String label;
+  final Color color;
+
+  const _StatCard({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 14, 12, 0),
+      decoration: BoxDecoration(
+        color: _kBg2,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _kDivider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Icon circle
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 20, color: color),
           ),
-          child: Icon(icon, size: 20, color: kTextSec),
+
+          const SizedBox(height: 10),
+
+          // Number
+          Text(
+            '$value',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 26,
+              fontWeight: FontWeight.w700,
+              color: _kText,
+              height: 1,
+            ),
+          ),
+
+          const SizedBox(height: 4),
+
+          // Label
+          Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: _kTextSec,
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Bottom color bar
+          Container(
+            height: 3,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(18),
+                bottomRight: Radius.circular(18),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Section label
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: _kTextSec,
+          letterSpacing: 1.2,
         ),
       ),
     );
@@ -749,11 +736,11 @@ class _ActionBtn extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Status filter row
+// Status filter chips
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _StatusFilterRow extends ConsumerWidget {
-  const _StatusFilterRow();
+class _StatusChips extends ConsumerWidget {
+  const _StatusChips();
 
   static const _items = [
     (TaskFilter.all, Icons.checklist_rounded, 'All'),
@@ -771,13 +758,13 @@ class _StatusFilterRow extends ConsumerWidget {
       height: 42,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: kPad),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         itemCount: _items.length,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (_, i) {
           final (filter, icon, label) = _items[i];
           final sel = current == filter;
-          return _SpringFilterChip(
+          return _SpringChip(
             icon: icon,
             label: label,
             selected: sel,
@@ -790,13 +777,13 @@ class _StatusFilterRow extends ConsumerWidget {
   }
 }
 
-class _SpringFilterChip extends StatefulWidget {
+class _SpringChip extends StatefulWidget {
   final IconData icon;
   final String label;
   final bool selected;
   final VoidCallback onTap;
 
-  const _SpringFilterChip({
+  const _SpringChip({
     required this.icon,
     required this.label,
     required this.selected,
@@ -804,10 +791,10 @@ class _SpringFilterChip extends StatefulWidget {
   });
 
   @override
-  State<_SpringFilterChip> createState() => _SpringFilterChipState();
+  State<_SpringChip> createState() => _SpringChipState();
 }
 
-class _SpringFilterChipState extends State<_SpringFilterChip>
+class _SpringChipState extends State<_SpringChip>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<double> _scale;
@@ -846,22 +833,17 @@ class _SpringFilterChipState extends State<_SpringFilterChip>
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 220),
           height: 42,
-          padding: const EdgeInsets.symmetric(horizontal: 18),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
-            gradient: sel
-                ? const LinearGradient(
-                    colors: [Color(0x336C63FF), Color(0x1A00E5FF)],
-                  )
-                : null,
-            color: sel ? null : kGlass,
-            borderRadius: BorderRadius.circular(kChipRadius),
+            color: sel ? _kTeal : _kGlass,
+            borderRadius: BorderRadius.circular(21),
             border: Border.all(
-              color: sel ? kPrimary.withValues(alpha: 0.5) : kDivider,
+              color: sel ? _kTeal : _kBorder,
             ),
             boxShadow: sel
                 ? [
                     BoxShadow(
-                        color: kPrimary.withValues(alpha: 0.22),
+                        color: _kTeal.withValues(alpha: 0.3),
                         blurRadius: 10,
                         offset: const Offset(0, 2))
                   ]
@@ -870,15 +852,15 @@ class _SpringFilterChipState extends State<_SpringFilterChip>
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(widget.icon, size: 14, color: sel ? kPrimary : kTextSec),
+              Icon(widget.icon, size: 14, color: sel ? _kBg : _kTextSec),
               const SizedBox(width: 6),
               Text(
                 widget.label,
                 style: TextStyle(
                   fontFamily: 'Inter',
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: sel ? FontWeight.w600 : FontWeight.w500,
-                  color: sel ? kPrimary : kTextSec,
+                  color: sel ? _kBg : _kTextSec,
                 ),
               ),
             ],
@@ -890,60 +872,92 @@ class _SpringFilterChipState extends State<_SpringFilterChip>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Gradient FAB — 72dp, Purple→Cyan, outer glow
+// Action button
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _GradientFAB extends StatelessWidget {
+class _ActionBtn extends StatelessWidget {
+  final IconData icon;
   final VoidCallback onTap;
-  const _GradientFAB({required this.onTap});
+
+  const _ActionBtn({required this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 72,
-        height: 72,
+        width: 40,
+        height: 40,
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: const LinearGradient(
-            colors: [kPrimary, kAccent],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: kPrimary.withValues(alpha: 0.45),
-              blurRadius: 20,
-              spreadRadius: 2,
-              offset: const Offset(0, 4),
-            ),
-            BoxShadow(
-              color: kAccent.withValues(alpha: 0.2),
-              blurRadius: 35,
-              spreadRadius: 4,
-            ),
-          ],
+          color: _kGlass,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _kBorder),
         ),
-        child: const Icon(Icons.add_rounded, size: 34, color: kText),
+        child: Icon(icon, size: 19, color: _kTextSec),
       ),
     );
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Home Empty State — Lottie + float
+// FAB — teal pill "  + Add Task"
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _HomeEmptyState extends StatefulWidget {
-  final TaskFilter filter;
-  const _HomeEmptyState({required this.filter});
+class _FAB extends StatelessWidget {
+  final VoidCallback onTap;
+  const _FAB({required this.onTap});
 
   @override
-  State<_HomeEmptyState> createState() => _HomeEmptyStateState();
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        decoration: BoxDecoration(
+          color: _kTeal,
+          borderRadius: BorderRadius.circular(26),
+          boxShadow: [
+            BoxShadow(
+              color: _kTeal.withValues(alpha: 0.45),
+              blurRadius: 20,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.add_rounded, size: 22, color: _kBg),
+            SizedBox(width: 8),
+            Text(
+              'Add Task',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: _kBg,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class _HomeEmptyStateState extends State<_HomeEmptyState>
+// ─────────────────────────────────────────────────────────────────────────────
+// Empty State — trophy Lottie + float animation
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _EmptyState extends StatefulWidget {
+  final TaskFilter filter;
+  const _EmptyState({required this.filter});
+  @override
+  State<_EmptyState> createState() => _EmptyStateState();
+}
+
+class _EmptyStateState extends State<_EmptyState>
     with SingleTickerProviderStateMixin {
   late final AnimationController _float;
 
@@ -951,7 +965,7 @@ class _HomeEmptyStateState extends State<_HomeEmptyState>
   void initState() {
     super.initState();
     _float = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 2200));
+        vsync: this, duration: const Duration(milliseconds: 2400));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && !MediaQuery.of(context).disableAnimations) {
         _float.repeat(reverse: true);
@@ -967,18 +981,18 @@ class _HomeEmptyStateState extends State<_HomeEmptyState>
 
   @override
   Widget build(BuildContext context) {
-    final (title, subtitle) = switch (widget.filter) {
+    final (title, sub) = switch (widget.filter) {
       TaskFilter.all => (
           "You're all clear! 🌟",
-          "Add something to tackle today."
+          "Add something to tackle today\nand keep the streak going."
         ),
       TaskFilter.today => ("Nothing due today ☀️", "Enjoy the breathing room."),
       TaskFilter.upcoming => (
-          "Nothing scheduled ahead 🗓️",
+          "Nothing scheduled 🗓️",
           "A clear horizon awaits."
         ),
       TaskFilter.overdue => (
-          "You're on top of everything! 🎉",
+          "You're on top! 🎉",
           "No overdue tasks. Great work."
         ),
       TaskFilter.completed => (
@@ -988,7 +1002,7 @@ class _HomeEmptyStateState extends State<_HomeEmptyState>
     };
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: kPad),
+      padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -998,8 +1012,9 @@ class _HomeEmptyStateState extends State<_HomeEmptyState>
             builder: (_, child) => Transform.translate(
               offset: Offset(
                   0,
-                  Tween<double>(begin: -8.0, end: 8.0).evaluate(CurvedAnimation(
-                      parent: _float, curve: Curves.easeInOut))),
+                  Tween<double>(begin: -10.0, end: 10.0).evaluate(
+                      CurvedAnimation(
+                          parent: _float, curve: Curves.easeInOut))),
               child: child,
             ),
             child: Lottie.asset(
@@ -1012,40 +1027,38 @@ class _HomeEmptyStateState extends State<_HomeEmptyState>
                 width: 120,
                 height: 120,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0x336C63FF), Color(0x1A00E5FF)],
-                  ),
+                  color: _kTealDim,
                   shape: BoxShape.circle,
-                  border: Border.all(color: kDivider),
+                  border: Border.all(color: _kTeal.withValues(alpha: 0.3)),
                 ),
-                child: const Icon(Icons.task_alt_rounded,
-                    size: 52, color: kPrimary),
+                child: const Icon(Icons.emoji_events_rounded,
+                    size: 56, color: _kTeal),
               ),
             ),
           ),
 
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
 
           Text(
             title,
             style: const TextStyle(
               fontFamily: 'Inter',
               fontSize: 22,
-              fontWeight: FontWeight.w600,
-              color: kText,
+              fontWeight: FontWeight.w700,
+              color: _kText,
               letterSpacing: -0.3,
             ),
             textAlign: TextAlign.center,
           ),
 
-          const SizedBox(height: kTextGap),
+          const SizedBox(height: 10),
 
           Text(
-            subtitle,
+            sub,
             style: const TextStyle(
               fontFamily: 'Inter',
-              fontSize: 15,
-              color: kTextSec,
+              fontSize: 14,
+              color: _kTextSec,
               height: 1.55,
             ),
             textAlign: TextAlign.center,

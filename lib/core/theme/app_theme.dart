@@ -5,18 +5,18 @@ import 'package:flutter/services.dart';
 // Design Token Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Color palette
-const kBg = Color(0xFF040816); // background
-const kBg2 = Color(0xFF0B1225); // secondary background
-const kGlass = Color(0x14FFFFFF); // rgba(255,255,255,0.08)
-const kPrimary = Color(0xFF6C63FF); // primary purple
+// Color palette — Jungle theme
+const kBg = Color(0xFF070D1A); // jungle near-black
+const kBg2 = Color(0xFF0D1628); // card bg
+const kGlass = Color(0x1AFFFFFF); // glass surface
+const kPrimary = Color(0xFF00C896); // jungle teal / primary green
 const kAccent = Color(0xFF00E5FF); // accent cyan
 const kCompleted = Color(0xFF2ECC71); // green
 const kWarning = Color(0xFFF39C12); // amber
 const kOverdue = Color(0xFFFF5C7A); // red-pink
 const kText = Color(0xFFFFFFFF); // white
-const kTextSec = Color(0xFFB6BED6); // secondary text
-const kDivider = Color(0x14FFFFFF); // rgba(255,255,255,0.08)
+const kTextSec = Color(0xFF8899AA); // secondary text
+const kDivider = Color(0x18FFFFFF); // divider
 
 // Spacing
 const kPad = 24.0; // screen padding
@@ -47,10 +47,10 @@ class AppTheme {
       brightness: Brightness.dark,
       surface: kBg,
       surfaceContainerLow: kBg2,
-      surfaceContainerHighest: Color(0xFF111827),
+      surfaceContainerHighest: Color(0xFF0D1628),
       primary: kPrimary,
-      onPrimary: kText,
-      primaryContainer: Color(0x336C63FF),
+      onPrimary: kBg,
+      primaryContainer: Color(0x2600C896),
       onPrimaryContainer: kPrimary,
       secondary: kAccent,
       onSecondary: kBg,
@@ -64,7 +64,7 @@ class AppTheme {
       onSurfaceVariant: kTextSec,
       outline: Color(0x33FFFFFF),
       outlineVariant: kDivider,
-      inverseSurface: Color(0xFFE8EAF6),
+      inverseSurface: Color(0xFFE8F5E9),
       onInverseSurface: kBg,
       inversePrimary: kPrimary,
     );
@@ -180,7 +180,7 @@ class AppTheme {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: kPrimary,
-          foregroundColor: kText,
+          foregroundColor: kBg,
           textStyle: const TextStyle(
             fontFamily: fontFamily,
             fontSize: 18,
